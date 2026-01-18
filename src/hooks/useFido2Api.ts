@@ -53,6 +53,7 @@ import type {
   AuthenticationResult,
 } from '../types/webauthn';
 import type { RegisterStartRequest, AuthStartRequest } from '../types/api';
+import { hookLogger as log } from '../utils/logger';
 
 /**
  * FIDO2 API 훅
@@ -88,6 +89,11 @@ import type { RegisterStartRequest, AuthStartRequest } from '../types/api';
 export function useFido2Api() {
   const { config } = useConfig();
 
+  log.debug('useFido2Api 훅 초기화', {
+    useMockServer: config.useMockServer,
+    serverUrl: config.serverUrl,
+  });
+
   /**
    * 실제 API 클라이언트 설정 동기화
    *
@@ -102,6 +108,10 @@ export function useFido2Api() {
    * @see services/api.ts:setApiConfig
    */
   useEffect(() => {
+    log.info('API 설정 동기화', {
+      serverUrl: config.serverUrl,
+      timeout: config.timeout,
+    });
     setApiConfig({
       baseUrl: config.serverUrl,
       timeout: config.timeout,
@@ -139,12 +149,33 @@ export function useFido2Api() {
    */
   const handleRegisterStart = useCallback(
     async (request: RegisterStartRequest): Promise<RegistrationOptionsResponse> => {
-      if (config.useMockServer) {
-        // Mock 모드: localStorage 기반 Mock 서버 사용
-        return mockRegisterStart(request);
+      log.group('등록 시작');
+      log.info('handleRegisterStart 호출', {
+        username: request.username,
+        mode: config.useMockServer ? 'Mock' : 'Real',
+      });
+
+      try {
+        let result: RegistrationOptionsResponse;
+        if (config.useMockServer) {
+          // Mock 모드: localStorage 기반 Mock 서버 사용
+          log.debug('Mock 서버 호출');
+          result = await mockRegisterStart(request);
+        } else {
+          // 실제 서버 모드: POST /api/passkey/register/start
+          log.debug('실제 서버 호출');
+          result = await registerStart(request);
+        }
+        log.info('등록 시작 완료', { challengeReceived: !!result.challenge });
+        log.groupEnd();
+        return result;
+      } catch (error) {
+        log.error('등록 시작 실패', {
+          errorMessage: error instanceof Error ? error.message : 'Unknown',
+        });
+        log.groupEnd();
+        throw error;
       }
-      // 실제 서버 모드: POST /api/passkey/register/start
-      return registerStart(request);
     },
     [config.useMockServer]
   );
@@ -180,12 +211,33 @@ export function useFido2Api() {
    */
   const handleRegisterFinish = useCallback(
     async (credential: RegistrationCredential): Promise<RegistrationResult> => {
-      if (config.useMockServer) {
-        // Mock 모드: localStorage에 저장
-        return mockRegisterFinish(credential);
+      log.group('등록 완료');
+      log.info('handleRegisterFinish 호출', {
+        credentialId: credential.id,
+        mode: config.useMockServer ? 'Mock' : 'Real',
+      });
+
+      try {
+        let result: RegistrationResult;
+        if (config.useMockServer) {
+          // Mock 모드: localStorage에 저장
+          log.debug('Mock 서버에 Credential 저장');
+          result = await mockRegisterFinish(credential);
+        } else {
+          // 실제 서버 모드: POST /api/passkey/register/finish
+          log.debug('실제 서버에 Credential 전송');
+          result = await registerFinish(credential);
+        }
+        log.info('등록 완료 결과', { success: result.success, message: result.message });
+        log.groupEnd();
+        return result;
+      } catch (error) {
+        log.error('등록 완료 실패', {
+          errorMessage: error instanceof Error ? error.message : 'Unknown',
+        });
+        log.groupEnd();
+        throw error;
       }
-      // 실제 서버 모드: POST /api/passkey/register/finish
-      return registerFinish(credential);
     },
     [config.useMockServer]
   );
@@ -219,12 +271,36 @@ export function useFido2Api() {
    */
   const handleAuthStart = useCallback(
     async (request: AuthStartRequest = {}): Promise<AuthenticationOptionsResponse> => {
-      if (config.useMockServer) {
-        // Mock 모드: localStorage에서 자격 증명 조회
-        return mockAuthStart(request);
+      log.group('인증 시작');
+      log.info('handleAuthStart 호출', {
+        username: request.username || '(Discoverable)',
+        mode: config.useMockServer ? 'Mock' : 'Real',
+      });
+
+      try {
+        let result: AuthenticationOptionsResponse;
+        if (config.useMockServer) {
+          // Mock 모드: localStorage에서 자격 증명 조회
+          log.debug('Mock 서버 호출');
+          result = await mockAuthStart(request);
+        } else {
+          // 실제 서버 모드: POST /api/passkey/auth/start
+          log.debug('실제 서버 호출');
+          result = await authStart(request);
+        }
+        log.info('인증 시작 완료', {
+          challengeReceived: !!result.challenge,
+          allowCredentialsCount: result.allowCredentials?.length || 0,
+        });
+        log.groupEnd();
+        return result;
+      } catch (error) {
+        log.error('인증 시작 실패', {
+          errorMessage: error instanceof Error ? error.message : 'Unknown',
+        });
+        log.groupEnd();
+        throw error;
       }
-      // 실제 서버 모드: POST /api/passkey/auth/start
-      return authStart(request);
     },
     [config.useMockServer]
   );
@@ -270,12 +346,37 @@ export function useFido2Api() {
    */
   const handleAuthFinish = useCallback(
     async (credential: AuthenticationCredential): Promise<AuthenticationResult> => {
-      if (config.useMockServer) {
-        // Mock 모드: localStorage에서 검증
-        return mockAuthFinish(credential);
+      log.group('인증 완료');
+      log.info('handleAuthFinish 호출', {
+        credentialId: credential.id,
+        mode: config.useMockServer ? 'Mock' : 'Real',
+      });
+
+      try {
+        let result: AuthenticationResult;
+        if (config.useMockServer) {
+          // Mock 모드: localStorage에서 검증
+          log.debug('Mock 서버에서 검증');
+          result = await mockAuthFinish(credential);
+        } else {
+          // 실제 서버 모드: POST /api/passkey/auth/finish
+          log.debug('실제 서버에서 검증');
+          result = await authFinish(credential);
+        }
+        log.info('인증 완료 결과', {
+          success: result.success,
+          username: result.username,
+          message: result.message,
+        });
+        log.groupEnd();
+        return result;
+      } catch (error) {
+        log.error('인증 완료 실패', {
+          errorMessage: error instanceof Error ? error.message : 'Unknown',
+        });
+        log.groupEnd();
+        throw error;
       }
-      // 실제 서버 모드: POST /api/passkey/auth/finish
-      return authFinish(credential);
     },
     [config.useMockServer]
   );

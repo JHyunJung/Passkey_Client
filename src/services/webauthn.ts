@@ -59,6 +59,7 @@ import {
   arrayBufferToBase64Url,
   base64UrlToArrayBuffer,
 } from './encoding';
+import { webauthnLogger as log } from '../utils/logger';
 
 /**
  * WebAuthn 지원 여부 확인
@@ -106,10 +107,12 @@ import {
  * @see https://developer.mozilla.org/en-US/docs/Web/API/PublicKeyCredential
  */
 export function isWebAuthnSupported(): boolean {
-  return !!(
+  const supported = !!(
     window.PublicKeyCredential &&
     typeof window.PublicKeyCredential === 'function'
   );
+  log.debug('WebAuthn 지원 여부 확인', { supported });
+  return supported;
 }
 
 /**
@@ -168,13 +171,19 @@ export function isWebAuthnSupported(): boolean {
  * @see https://www.w3.org/TR/webauthn/#dom-publickeycredential-isuserverifyingplatformauthenticatoravailable
  */
 export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
+  log.debug('Platform Authenticator 가용성 확인 시작');
+
   if (!isWebAuthnSupported()) {
+    log.warn('WebAuthn이 지원되지 않아 Platform Authenticator 사용 불가');
     return false;
   }
 
   try {
-    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-  } catch {
+    const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    log.info('Platform Authenticator 가용성 확인 완료', { available });
+    return available;
+  } catch (error) {
+    log.error('Platform Authenticator 가용성 확인 실패', error);
     return false;
   }
 }
@@ -243,7 +252,10 @@ export async function isPlatformAuthenticatorAvailable(): Promise<boolean> {
  * @see https://github.com/w3c/webauthn/wiki/Explainer:-WebAuthn-Conditional-UI
  */
 export async function isConditionalMediationAvailable(): Promise<boolean> {
+  log.debug('Conditional Mediation 지원 여부 확인 시작');
+
   if (!isWebAuthnSupported()) {
+    log.warn('WebAuthn이 지원되지 않아 Conditional Mediation 사용 불가');
     return false;
   }
 
@@ -253,10 +265,14 @@ export async function isConditionalMediationAvailable(): Promise<boolean> {
       isConditionalMediationAvailable?: () => Promise<boolean>;
     };
     if (pkc.isConditionalMediationAvailable) {
-      return await pkc.isConditionalMediationAvailable();
+      const available = await pkc.isConditionalMediationAvailable();
+      log.info('Conditional Mediation 지원 여부', { available });
+      return available;
     }
+    log.debug('isConditionalMediationAvailable API가 존재하지 않음');
     return false;
-  } catch {
+  } catch (error) {
+    log.error('Conditional Mediation 확인 중 오류', error);
     return false;
   }
 }
@@ -330,6 +346,16 @@ export async function isConditionalMediationAvailable(): Promise<boolean> {
 export function convertRegistrationOptions(
   serverOptions: RegistrationOptionsResponse
 ): PublicKeyCredentialCreationOptions {
+  log.group('등록 옵션 변환');
+  log.debug('서버 옵션 수신', {
+    rp: serverOptions.rp,
+    user: { name: serverOptions.user.name, displayName: serverOptions.user.displayName },
+    timeout: serverOptions.timeout,
+    attestation: serverOptions.attestation,
+    pubKeyCredParams: serverOptions.pubKeyCredParams,
+    excludeCredentialsCount: serverOptions.excludeCredentials?.length || 0,
+  });
+
   const options: PublicKeyCredentialCreationOptions = {
     challenge: base64UrlToArrayBuffer(serverOptions.challenge),
     rp: serverOptions.rp,
@@ -345,6 +371,7 @@ export function convertRegistrationOptions(
 
   if (serverOptions.authenticatorSelection) {
     options.authenticatorSelection = serverOptions.authenticatorSelection;
+    log.debug('Authenticator 선택 옵션', serverOptions.authenticatorSelection);
   }
 
   if (serverOptions.excludeCredentials) {
@@ -353,8 +380,11 @@ export function convertRegistrationOptions(
       id: base64UrlToArrayBuffer(cred.id),
       transports: cred.transports,
     }));
+    log.debug('제외할 Credential 수', { count: serverOptions.excludeCredentials.length });
   }
 
+  log.info('등록 옵션 변환 완료');
+  log.groupEnd();
   return options;
 }
 
@@ -440,6 +470,14 @@ export function convertRegistrationOptions(
 export function convertAuthenticationOptions(
   serverOptions: AuthenticationOptionsResponse
 ): PublicKeyCredentialRequestOptions {
+  log.group('인증 옵션 변환');
+  log.debug('서버 옵션 수신', {
+    rpId: serverOptions.rpId,
+    timeout: serverOptions.timeout,
+    userVerification: serverOptions.userVerification,
+    allowCredentialsCount: serverOptions.allowCredentials?.length || 0,
+  });
+
   const options: PublicKeyCredentialRequestOptions = {
     challenge: base64UrlToArrayBuffer(serverOptions.challenge),
     timeout: serverOptions.timeout,
@@ -453,8 +491,13 @@ export function convertAuthenticationOptions(
       id: base64UrlToArrayBuffer(cred.id),
       transports: cred.transports,
     }));
+    log.debug('허용된 Credential 수', { count: serverOptions.allowCredentials.length });
+  } else {
+    log.debug('Discoverable Credential 모드 (allowCredentials 없음)');
   }
 
+  log.info('인증 옵션 변환 완료');
+  log.groupEnd();
   return options;
 }
 
@@ -552,27 +595,59 @@ export function convertAuthenticationOptions(
 export async function createCredential(
   options: PublicKeyCredentialCreationOptions
 ): Promise<RegistrationCredential> {
-  const credential = await navigator.credentials.create({
-    publicKey: options,
-  }) as PublicKeyCredential;
+  log.group('Credential 생성 (등록)');
+  log.info('navigator.credentials.create() 호출 시작');
+  log.startTimer('createCredential');
 
-  if (!credential) {
-    throw new Error('Credential 생성 실패');
+  try {
+    const credential = await navigator.credentials.create({
+      publicKey: options,
+    }) as PublicKeyCredential;
+
+    log.endTimer('createCredential');
+
+    if (!credential) {
+      log.error('Credential 생성 실패 - null 반환');
+      throw new Error('Credential 생성 실패');
+    }
+
+    const response = credential.response as AuthenticatorAttestationResponse;
+
+    log.info('Credential 생성 성공', {
+      credentialId: credential.id,
+      type: credential.type,
+      authenticatorAttachment: credential.authenticatorAttachment,
+    });
+
+    const result: RegistrationCredential = {
+      id: credential.id,
+      rawId: arrayBufferToBase64Url(credential.rawId),
+      response: {
+        clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
+        attestationObject: arrayBufferToBase64Url(response.attestationObject),
+      },
+      type: 'public-key',
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment || undefined,
+    };
+
+    log.debug('Credential 응답 데이터', {
+      clientDataJSONLength: result.response.clientDataJSON.length,
+      attestationObjectLength: result.response.attestationObject.length,
+      extensionResults: result.clientExtensionResults,
+    });
+
+    log.groupEnd();
+    return result;
+  } catch (error) {
+    log.endTimer('createCredential');
+    log.error('Credential 생성 중 오류 발생', {
+      errorName: error instanceof DOMException ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    log.groupEnd();
+    throw error;
   }
-
-  const response = credential.response as AuthenticatorAttestationResponse;
-
-  return {
-    id: credential.id,
-    rawId: arrayBufferToBase64Url(credential.rawId),
-    response: {
-      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
-      attestationObject: arrayBufferToBase64Url(response.attestationObject),
-    },
-    type: 'public-key',
-    clientExtensionResults: credential.getClientExtensionResults(),
-    authenticatorAttachment: credential.authenticatorAttachment || undefined,
-  };
 }
 
 /**
@@ -709,31 +784,65 @@ export async function createCredential(
 export async function getCredential(
   options: PublicKeyCredentialRequestOptions
 ): Promise<AuthenticationCredential> {
-  const credential = await navigator.credentials.get({
-    publicKey: options,
-  }) as PublicKeyCredential;
+  log.group('Credential 획득 (인증)');
+  log.info('navigator.credentials.get() 호출 시작');
+  log.startTimer('getCredential');
 
-  if (!credential) {
-    throw new Error('Credential 획득 실패');
+  try {
+    const credential = await navigator.credentials.get({
+      publicKey: options,
+    }) as PublicKeyCredential;
+
+    log.endTimer('getCredential');
+
+    if (!credential) {
+      log.error('Credential 획득 실패 - null 반환');
+      throw new Error('Credential 획득 실패');
+    }
+
+    const response = credential.response as AuthenticatorAssertionResponse;
+
+    log.info('Credential 획득 성공', {
+      credentialId: credential.id,
+      type: credential.type,
+      authenticatorAttachment: credential.authenticatorAttachment,
+      hasUserHandle: !!response.userHandle,
+    });
+
+    const result: AuthenticationCredential = {
+      id: credential.id,
+      rawId: arrayBufferToBase64Url(credential.rawId),
+      response: {
+        clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
+        authenticatorData: arrayBufferToBase64Url(response.authenticatorData),
+        signature: arrayBufferToBase64Url(response.signature),
+        userHandle: response.userHandle
+          ? arrayBufferToBase64Url(response.userHandle)
+          : undefined,
+      },
+      type: 'public-key',
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment || undefined,
+    };
+
+    log.debug('Assertion 응답 데이터', {
+      clientDataJSONLength: result.response.clientDataJSON.length,
+      authenticatorDataLength: result.response.authenticatorData.length,
+      signatureLength: result.response.signature.length,
+      hasUserHandle: !!result.response.userHandle,
+    });
+
+    log.groupEnd();
+    return result;
+  } catch (error) {
+    log.endTimer('getCredential');
+    log.error('Credential 획득 중 오류 발생', {
+      errorName: error instanceof DOMException ? error.name : 'Unknown',
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    log.groupEnd();
+    throw error;
   }
-
-  const response = credential.response as AuthenticatorAssertionResponse;
-
-  return {
-    id: credential.id,
-    rawId: arrayBufferToBase64Url(credential.rawId),
-    response: {
-      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
-      authenticatorData: arrayBufferToBase64Url(response.authenticatorData),
-      signature: arrayBufferToBase64Url(response.signature),
-      userHandle: response.userHandle
-        ? arrayBufferToBase64Url(response.userHandle)
-        : undefined,
-    },
-    type: 'public-key',
-    clientExtensionResults: credential.getClientExtensionResults(),
-    authenticatorAttachment: credential.authenticatorAttachment || undefined,
-  };
 }
 
 /**
@@ -873,26 +982,41 @@ export async function getCredential(
  * @see https://www.w3.org/TR/webauthn/#sctn-error-handling
  */
 export function getWebAuthnErrorMessage(error: unknown): string {
+  log.debug('WebAuthn 에러 메시지 변환', {
+    errorType: error?.constructor?.name,
+    errorName: error instanceof DOMException ? error.name : undefined,
+  });
+
   if (error instanceof DOMException) {
+    let message: string;
     switch (error.name) {
       case 'NotAllowedError':
-        return '사용자가 인증을 취소했거나 시간이 초과되었습니다.';
+        message = '사용자가 인증을 취소했거나 시간이 초과되었습니다.';
+        break;
       case 'InvalidStateError':
-        return '이미 등록된 인증기가 있습니다.';
+        message = '이미 등록된 인증기가 있습니다.';
+        break;
       case 'NotSupportedError':
-        return '지원되지 않는 인증 방식입니다.';
+        message = '지원되지 않는 인증 방식입니다.';
+        break;
       case 'SecurityError':
-        return '보안 오류가 발생했습니다. HTTPS 연결을 확인하세요.';
+        message = '보안 오류가 발생했습니다. HTTPS 연결을 확인하세요.';
+        break;
       case 'AbortError':
-        return '인증이 중단되었습니다.';
+        message = '인증이 중단되었습니다.';
+        break;
       default:
-        return `인증 오류: ${error.message}`;
+        message = `인증 오류: ${error.message}`;
     }
+    log.warn('WebAuthn 에러 발생', { errorName: error.name, message });
+    return message;
   }
 
   if (error instanceof Error) {
+    log.warn('일반 에러 발생', { message: error.message });
     return error.message;
   }
 
+  log.error('알 수 없는 에러 타입', { error });
   return '알 수 없는 오류가 발생했습니다.';
 }
