@@ -5,12 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:qa": "vite --mode qa",
     "build": "tsc -b && vite build",
+    "build:qa": "tsc -b && vite build --mode qa",
     "build:analyze": "tsc -b && vite build --mode analyze",
     "type-check": "tsc -b --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
+    "preview:qa": "vite preview --mode qa --port 8083",
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
