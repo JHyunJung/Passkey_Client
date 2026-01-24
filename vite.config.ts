@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
     ].filter(Boolean),
     server: {
       port,
+      host: '0.0.0.0',  // 외부 접속 허용
       allowedHosts: ['.trycloudflare.com']
     },
     build: {
