@@ -107,7 +107,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       // JSON 파싱 실패 또는 localStorage 접근 실패
       // 개발 환경에서는 콘솔에 경고 표시
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.warn('Failed to load config from localStorage:', error);
       }
     }
@@ -126,7 +126,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       // localStorage가 가득 찼거나 접근 불가능한 경우
       // 치명적인 오류는 아니므로 무시
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         console.warn('Failed to save config to localStorage:', error);
       }
     }

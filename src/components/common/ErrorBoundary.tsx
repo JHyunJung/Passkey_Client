@@ -15,7 +15,7 @@
  * @since 1.0.0
  */
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 /**
  * ErrorBoundary Props
@@ -138,7 +138,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
    */
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // 개발 환경에서만 상세 로깅
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.error('ErrorBoundary caught an error:', error);
       console.error('Error info:', errorInfo);
       console.error('Component stack:', errorInfo.componentStack);
@@ -211,7 +211,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             </h2>
             <p className="text-gray-600 text-center mb-6">
               예상치 못한 오류로 인해 페이지를 표시할 수 없습니다.
-              {process.env.NODE_ENV === 'development' && (
+              {import.meta.env.DEV && (
                 <>
                   <br />
                   <br />

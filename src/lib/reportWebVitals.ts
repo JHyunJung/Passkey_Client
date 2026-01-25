@@ -20,36 +20,6 @@
 import type { Metric } from 'web-vitals';
 
 /**
- * 성능 지표 임계값 (Good/Needs Improvement/Poor)
- *
- * @see https://web.dev/articles/vitals
- */
-const THRESHOLDS = {
-  LCP: { good: 2500, poor: 4000 },      // Largest Contentful Paint (ms)
-  FID: { good: 100, poor: 300 },        // First Input Delay (ms)
-  CLS: { good: 0.1, poor: 0.25 },       // Cumulative Layout Shift (score)
-  FCP: { good: 1800, poor: 3000 },      // First Contentful Paint (ms)
-  TTFB: { good: 800, poor: 1800 },      // Time to First Byte (ms)
-  INP: { good: 200, poor: 500 },        // Interaction to Next Paint (ms)
-};
-
-/**
- * 성능 등급 판정
- *
- * @param name - 지표 이름
- * @param value - 측정값
- * @returns 성능 등급 (good, needs-improvement, poor)
- */
-function getRating(name: string, value: number): string {
-  const threshold = THRESHOLDS[name as keyof typeof THRESHOLDS];
-  if (!threshold) return 'unknown';
-
-  if (value <= threshold.good) return 'good';
-  if (value <= threshold.poor) return 'needs-improvement';
-  return 'poor';
-}
-
-/**
  * 성능 지표를 콘솔에 출력
  *
  * 개발 환경에서 성능 지표를 시각적으로 확인하기 위해 사용됩니다.
@@ -111,9 +81,9 @@ function logMetricToConsole(metric: Metric): void {
  * }
  * ```
  */
-function sendToAnalytics(metric: Metric): void {
+function sendToAnalytics(_metric: Metric): void {
   // 프로덕션 환경에서만 전송
-  if (process.env.NODE_ENV !== 'production') {
+  if (!import.meta.env.PROD) {
     return;
   }
 
@@ -182,7 +152,7 @@ export function reportWebVitals(onPerfEntry?: (metric: Metric) => void): void {
     // 각 성능 지표 측정
     const handleMetric = (metric: Metric) => {
       // 개발 환경: 콘솔에 출력
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.DEV) {
         logMetricToConsole(metric);
       }
 
@@ -206,7 +176,7 @@ export function reportWebVitals(onPerfEntry?: (metric: Metric) => void): void {
     onINP(handleMetric);  // Interaction to Next Paint (replaces FID)
   }).catch((error) => {
     // web-vitals 로드 실패 시 무시 (치명적이지 않음)
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.warn('Failed to load web-vitals:', error);
     }
   });

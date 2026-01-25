@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Key, Mail, ArrowLeft, Fingerprint, Loader2, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
+import { Key, Mail, ArrowLeft, Fingerprint, CheckCircle2, XCircle, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button, AnimatedBackground } from '../components/common';
 import { useFido2Api } from '../hooks/useFido2Api';

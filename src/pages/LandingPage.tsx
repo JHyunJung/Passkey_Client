@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Shield, Fingerprint, Key, Sparkles, Check, ArrowRight } from 'lucide-react';
-import { cn } from '../lib/utils';
 import { useConfig } from '../context/ConfigContext';
 import { Button, AnimatedBackground } from '../components/common';
 import {
