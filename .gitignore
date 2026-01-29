@@ -12,11 +12,10 @@ dist
 dist-ssr
 *.local
 
-# 환경 설정 파일 - .env.qa는 버전 관리에 포함
+# 환경 설정 파일
 .env
 .env.local
 .env.*.local
-!.env.qa
 
 # Editor directories and files
 .vscode/*
