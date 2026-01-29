@@ -89,6 +89,7 @@ function sendToAnalytics(_metric: Metric): void {
 
   // TODO: 실제 분석 서비스로 데이터 전송
   // 예: Google Analytics, Sentry, LogRocket 등
+  // 구현 전까지 metric 파라미터는 사용되지 않음
 
   // 예시: Beacon API를 사용한 전송 (서버 엔드포인트 필요)
   /*

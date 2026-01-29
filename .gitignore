@@ -33,3 +33,9 @@ dist-ssr
 
 # Playwright MCP
 .playwright-mcp/
+
+# Serena MCP
+.serena/
+
+# Documentation files (learning materials)
+Learn_Project.md
