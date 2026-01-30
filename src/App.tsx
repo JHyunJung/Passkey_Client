@@ -32,7 +32,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ConfigProvider>
-        <BrowserRouter>
+        <BrowserRouter basename="/client">
           <Layout>
             <Suspense fallback={<PageLoader />}>
               <Routes>
