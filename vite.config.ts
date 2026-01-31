@@ -25,10 +25,6 @@ export default defineConfig(({ mode }) => {
       port,
       host: '0.0.0.0',  // 외부 접속 허용
       allowedHosts: ['.trycloudflare.com'],
-      https: {
-        key: '',
-        cert: ''
-      }
     },
     build: {
       // Generate source maps for production debugging
