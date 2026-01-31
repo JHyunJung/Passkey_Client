@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "preview:qa": "vite preview --mode qa --port 8003",
+    "preview:qa": "vite preview --mode qa --port 80",
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {

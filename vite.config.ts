@@ -7,8 +7,8 @@ export default defineConfig(({ mode }) => {
   // 환경 변수 로드
   const env = loadEnv(mode, process.cwd(), '')
 
-  // QA 모드일 경우 8003 포트 사용
-  const port = mode === 'qa' ? 8003 : (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173)
+  // QA 모드일 경우 80 포트 사용 (Docker 환경)
+  const port = mode === 'qa' ? 80 : (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173)
 
   return {
     plugins: [
