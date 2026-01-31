@@ -7,12 +7,10 @@ export default defineConfig(({ mode }) => {
   // 환경 변수 로드
   const env = loadEnv(mode, process.cwd(), '')
 
-  // QA 모드일 경우 80 포트 사용 (Docker 환경)
-  const port = mode === 'qa' ? 80 : (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173)
+  // 포트 설정 (환경 변수 또는 기본값 5173)
+  const port = env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173
 
   return {
-    // Base URL for QA mode (served under /client path)
-    base: mode === 'qa' ? '/client' : '/',
     plugins: [
       react(),
       // Bundle analyzer in analyze mode
