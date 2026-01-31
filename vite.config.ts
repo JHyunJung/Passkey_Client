@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => {
   const port = mode === 'qa' ? 80 : (env.VITE_PORT ? parseInt(env.VITE_PORT) : 5173)
 
   return {
-    // Base URL for QA mode (served under /client/ path)
-    base: mode === 'qa' ? '/client/' : '/',
+    // Base URL for QA mode (served under /client path)
+    base: mode === 'qa' ? '/client' : '/',
     plugins: [
       react(),
       // Bundle analyzer in analyze mode
